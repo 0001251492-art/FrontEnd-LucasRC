@@ -188,6 +188,16 @@
                 </div>
                 <span class="text-[11px] font-bold text-purple-200 mt-1">Super Raios</span>
             </div>
+
+            <!-- T: Ondas do Inferno -->
+            <div id="slot-t" class="glass-panel p-2 rounded-xl border border-red-500/50 flex flex-col items-center relative group hidden">
+                <span class="absolute -top-3 bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded shadow font-cinzel">T</span>
+                <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-red-950/80 flex items-center justify-center text-orange-400 text-2xl font-bold relative overflow-hidden shadow-lg shadow-red-500/30">
+                    <i class="fa-solid fa-fire-flame-curved"></i>
+                    <div id="cd-t" class="cooldown-overlay absolute bottom-0 left-0 right-0 h-0"></div>
+                </div>
+                <span class="text-[11px] font-bold text-red-200 mt-1">Inferno</span>
+            </div>
         </div>
     </div>
 
@@ -233,6 +243,7 @@
                     <div class="text-xs text-gray-300 flex justify-between"><span>Ataque Espada:</span> <strong class="text-amber-200">Espaço / Clique</strong></div>
                     <div class="text-xs text-gray-300 flex justify-between"><span>Magias:</span> <strong class="text-amber-200">Q (Fogo), E (Gelo), F (Raios)</strong></div>
                     <div class="text-xs text-gray-300 flex justify-between"><span>Super Raios:</span> <strong class="text-amber-200">R (Se liberado)</strong></div>
+                    <div class="text-xs text-gray-300 flex justify-between"><span>Ondas do Inferno:</span> <strong class="text-amber-200">T (Se liberadas)</strong></div>
                     <div class="text-xs text-gray-300 flex justify-between"><span>Regeneração HP:</span> <strong class="text-green-400">+2 HP/3s (Fora de combate)</strong></div>
                 </div>
             </div>
@@ -403,7 +414,9 @@
                 cdE: 0, maxCdE: 6,
                 cdF: 0, maxCdF: 5,
                 cdR: 0, maxCdR: 12,
+                cdT: 0, maxCdT: 18,
                 hasSuperSkill: false,
+                hasInfernoSkill: false,
 
                 // Passives unlocked
                 passives: {
@@ -465,6 +478,7 @@
                     if (e.key.toLowerCase() === 'e') castSkillE();
                     if (e.key.toLowerCase() === 'f') castSkillF();
                     if (e.key.toLowerCase() === 'r' && player.hasSuperSkill) castSkillR();
+                    if (e.key.toLowerCase() === 't' && player.hasInfernoSkill) castSkillT();
                 }
             });
 
@@ -586,8 +600,19 @@
                 const scale = player.getSkillScale();
                 const waveRadius = 140 * scale;
                 const dmg = Math.floor(30 * scale * (1 + player.level * 0.08));
+                const waveDuration = 0.45;
 
                 screenShake = 5;
+
+                particles.push({
+                    type: 'ice_wave',
+                    x: player.x,
+                    y: player.y,
+                    radius: waveRadius,
+                    scale: scale,
+                    life: waveDuration,
+                    maxLife: waveDuration
+                });
 
                 // Slow and damage all enemies in area
                 enemies.forEach(enemy => {
@@ -714,6 +739,34 @@
                 }
             }
 
+            // T: Inferno Waves
+            function castSkillT() {
+                if (player.cdT > 0) return;
+                player.cdT = player.maxCdT;
+
+                const scale = player.getSkillScale();
+                const waveDuration = 1.1;
+                const waveRadius = 520 * scale;
+                const dmg = Math.floor(90 * scale * (1 + player.level * 0.12));
+
+                screenShake = 12;
+                for (let wave = 0; wave < 3; wave++) {
+                    particles.push({
+                        type: 'inferno_wave',
+                        x: player.x,
+                        y: player.y,
+                        radius: waveRadius,
+                        scale: scale,
+                        damage: dmg,
+                        delay: wave * 0.2,
+                        life: waveDuration,
+                        maxLife: waveDuration,
+                        previousRadius: 0,
+                        hitEnemies: new Set()
+                    });
+                }
+            }
+
             // --- DAMAGE & COMBAT UTILS ---
             function damageEnemy(enemy, amount) {
                 enemy.hp -= amount;
@@ -780,7 +833,7 @@
 
                 if (player.hp <= 0) {
                     player.hp = 0;
-                    alert(`Seu Paladino sucumbiu aos monstros mitológicos!\nNível Alcançado: ${player.level}\nInimigos Mortos: ${totalKills}`);
+                    alert(`Morreuuuu :( !\nNível Alcançado: ${player.level}\nInimigos Mortos: ${totalKills}`);
                     location.reload();
                 }
             }
@@ -847,6 +900,7 @@
 
                     const superSkills = [
                         { id: 'super_zeus', name: 'Tempestade de Zeus', icon: 'fa-cloud-bolt', color: 'text-purple-400', desc: 'Invocação de tempestade devastadora que atinge toda a tela com raios míticos.' },
+                        { id: 'super_inferno', name: 'Ondas do Inferno', icon: 'fa-fire-flame-curved', color: 'text-red-400', desc: 'Três ondas de fogo atravessam o campo, incinerando inimigos em uma vasta área.' },
                         { id: 'super_shield', name: 'Égide Sagrada', icon: 'fa-shield-cat', color: 'text-amber-400', desc: 'Escudo impenetrável permanente que reduz todo o dano recebido em 30%.' },
                         { id: 'super_aura', name: 'Aura Olímpica Incandescente', icon: 'fa-sun', color: 'text-orange-400', desc: 'Aura contínua de fogo ao redor do paladino queimando inimigos próximos.' }
                     ];
@@ -863,6 +917,9 @@
                             if (s.id === 'super_zeus') {
                                 player.hasSuperSkill = true;
                                 document.getElementById('slot-r').classList.remove('hidden');
+                            } else if (s.id === 'super_inferno') {
+                                player.hasInfernoSkill = true;
+                                document.getElementById('slot-t').classList.remove('hidden');
                             } else if (s.id === 'super_shield') {
                                 player.passives.shield = true;
                             } else if (s.id === 'super_aura') {
@@ -1045,6 +1102,7 @@
                 if (player.cdE > 0) player.cdE = Math.max(0, player.cdE - dt);
                 if (player.cdF > 0) player.cdF = Math.max(0, player.cdF - dt);
                 if (player.cdR > 0) player.cdR = Math.max(0, player.cdR - dt);
+                if (player.cdT > 0) player.cdT = Math.max(0, player.cdT - dt);
                 if (player.attackTimer > 0) {
                     player.attackTimer = Math.max(0, player.attackTimer - dt);
                     player.isAttacking = player.attackTimer > 0;
@@ -1160,9 +1218,28 @@
 
                     // Collision with enemies
                     enemies.forEach(e => {
-                        if (Math.hypot(e.x - p.x, e.y - p.y) < p.radius + e.radius) {
+                        if (p.life > 0 && Math.hypot(e.x - p.x, e.y - p.y) < p.radius + e.radius) {
+                            p.life = 0;
                             damageEnemy(e, p.damage);
-                            p.life = 0; // Explode
+
+                            const sparkCount = 8;
+                            for (let sparkIndex = 0; sparkIndex < sparkCount; sparkIndex++) {
+                                const sparkAngle = (Math.PI * 2 / sparkCount) * sparkIndex + Math.random() * 0.25;
+                                const sparkSpeed = (130 + Math.random() * 90) * p.scale;
+                                particles.push({
+                                    type: 'fire_spark',
+                                    x: p.x,
+                                    y: p.y,
+                                    vx: Math.cos(sparkAngle) * sparkSpeed,
+                                    vy: Math.sin(sparkAngle) * sparkSpeed,
+                                    radius: 4 * p.scale,
+                                    scale: p.scale,
+                                    damage: Math.max(1, Math.floor(p.damage * 0.08)),
+                                    explosionRadius: 32 * p.scale,
+                                    color: sparkIndex % 2 === 0 ? '#fb923c' : '#facc15',
+                                    life: 0.25 + Math.random() * 0.12
+                                });
+                            }
                         }
                     });
                 });
@@ -1179,7 +1256,47 @@
                 itemsOnGround = itemsOnGround.filter(i => i.life > 0);
 
                 // 10. Update Particles & Floating Texts
-                particles.forEach(p => p.life -= dt);
+                particles.forEach(p => {
+                    if (p.type === 'fire_spark') {
+                        p.x += p.vx * dt;
+                        p.y += p.vy * dt;
+                        p.life -= dt;
+
+                        if (p.life <= 0) {
+                            p.type = 'fire_pop';
+                            p.radius = p.explosionRadius;
+                            p.maxLife = 0.18;
+                            p.life = p.maxLife;
+
+                            enemies.forEach(enemy => {
+                                if (Math.hypot(enemy.x - p.x, enemy.y - p.y) < p.explosionRadius + enemy.radius) {
+                                    damageEnemy(enemy, p.damage);
+                                }
+                            });
+                        }
+                    } else if (p.type === 'inferno_wave') {
+                        if (p.delay > 0) {
+                            p.delay = Math.max(0, p.delay - dt);
+                        } else {
+                            p.life -= dt;
+                            const currentRadius = p.radius * (1 - p.life / p.maxLife);
+
+                            enemies.forEach(enemy => {
+                                const dist = Math.hypot(enemy.x - p.x, enemy.y - p.y);
+                                if (!p.hitEnemies.has(enemy) &&
+                                    dist + enemy.radius >= p.previousRadius &&
+                                    dist - enemy.radius <= currentRadius) {
+                                    p.hitEnemies.add(enemy);
+                                    damageEnemy(enemy, p.damage);
+                                }
+                            });
+
+                            p.previousRadius = currentRadius;
+                        }
+                    } else {
+                        p.life -= dt;
+                    }
+                });
                 particles = particles.filter(p => p.life > 0);
 
                 floatingTexts.forEach(ft => {
@@ -1440,9 +1557,79 @@
                     ctx.restore();
                 });
 
-                // 8. Draw Particles & Lightning Effects
+                // 8. Draw Particles & Lightning Effects "Ondas do inferno"
                 particles.forEach(p => {
-                    if (p.type === 'lightning_beam') {
+                    if (p.type === 'ice_wave') {
+                        const progress = 1 - p.life / p.maxLife;
+                        const radius = p.radius * progress;
+                        const alpha = p.life / p.maxLife;
+                        const sx = p.x - camera.x;
+                        const sy = p.y - camera.y;
+
+                        ctx.save();
+                        ctx.globalAlpha = alpha;
+                        ctx.fillStyle = 'rgba(56, 189, 248, 0.12)';
+                        ctx.strokeStyle = '#7dd3fc';
+                        ctx.lineWidth = 3 * p.scale;
+                        ctx.shadowColor = '#38bdf8';
+                        ctx.shadowBlur = 16 * p.scale;
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, radius, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.restore();
+                    } else if (p.type === 'fire_spark') {
+                        const sx = p.x - camera.x;
+                        const sy = p.y - camera.y;
+
+                        ctx.save();
+                        ctx.fillStyle = p.color;
+                        ctx.shadowColor = '#f97316';
+                        ctx.shadowBlur = 12 * p.scale;
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, p.radius, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    } else if (p.type === 'fire_pop') {
+                        const progress = 1 - p.life / p.maxLife;
+                        const radius = p.radius * (0.25 + progress * 0.75);
+                        const sx = p.x - camera.x;
+                        const sy = p.y - camera.y;
+
+                        ctx.save();
+                        ctx.globalAlpha = p.life / p.maxLife;
+                        ctx.fillStyle = 'rgba(249, 115, 22, 0.22)';
+                        ctx.strokeStyle = '#facc15';
+                        ctx.lineWidth = 2 * p.scale;
+                        ctx.shadowColor = '#ef4444';
+                        ctx.shadowBlur = 12 * p.scale;
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, radius, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.restore();
+                    } else if (p.type === 'inferno_wave') {
+                        if (p.delay > 0) return;
+
+                        const progress = 1 - p.life / p.maxLife;
+                        const radius = p.radius * progress;
+                        const alpha = p.life / p.maxLife;
+                        const sx = p.x - camera.x;
+                        const sy = p.y - camera.y;
+
+                        ctx.save();
+                        ctx.globalAlpha = alpha;
+                        ctx.fillStyle = 'rgba(249, 115, 22, 0.14)';
+                        ctx.strokeStyle = '#fb923c';
+                        ctx.lineWidth = 4 * p.scale;
+                        ctx.shadowColor = '#ef4444';
+                        ctx.shadowBlur = 18 * p.scale;
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, radius, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.restore();
+                    } else if (p.type === 'lightning_beam') {
                         ctx.save();
                         ctx.strokeStyle = p.color;
                         ctx.lineWidth = 4;
@@ -1526,6 +1713,7 @@
                 document.getElementById('cd-e').style.height = `${(player.cdE / player.maxCdE) * 100}%`;
                 document.getElementById('cd-f').style.height = `${(player.cdF / player.maxCdF) * 100}%`;
                 document.getElementById('cd-r').style.height = `${(player.cdR / player.maxCdR) * 100}%`;
+                document.getElementById('cd-t').style.height = `${(player.cdT / player.maxCdT) * 100}%`;
 
                 // Boss HUD
                 if (currentBoss) {
