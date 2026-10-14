@@ -1,0 +1,1562 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Olimpo LitRPG: A Roda dos Deuses</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;800;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background-color: #0b0c10;
+            color: #e0e6ed;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+        }
+        .font-cinzel {
+            font-family: 'Cinzel', serif;
+        }
+        /* Custom UI Styling */
+        .mythic-border {
+            border: 2px solid #d4af37;
+            box-shadow: 0 0 15px rgba(212, 175, 55, 0.3), inset 0 0 10px rgba(212, 175, 55, 0.2);
+        }
+        .mythic-card {
+            background: linear-gradient(135deg, rgba(20, 24, 33, 0.95), rgba(10, 12, 18, 0.98));
+            border: 2px solid #c5a059;
+            transition: all 0.25s ease-in-out;
+        }
+        .mythic-card:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 10px 25px rgba(212, 175, 55, 0.5);
+            border-color: #fff0a8;
+        }
+        .glass-panel {
+            background: rgba(15, 20, 30, 0.85);
+            backdrop-filter: blur(8px);
+        }
+        /* Skill Bar Cooldown overlays */
+        .cooldown-overlay {
+            background: rgba(0, 0, 0, 0.7);
+            transition: height 0.1s linear;
+        }
+        /* Custom Scrollbar for Inventory */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(10, 10, 15, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d4af37;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden flex items-center justify-center">
+
+    <!-- Game Canvas -->
+    <canvas id="gameCanvas" class="absolute inset-0 w-full h-full block z-0"></canvas>
+
+    <!-- UI HUD Overlay -->
+    <div id="hud" class="absolute inset-0 pointer-events-none z-10 flex flex-col justify-between p-4">
+        
+        <!-- Top Header: Stats & Biome Info -->
+        <div class="flex justify-between items-start w-full gap-4">
+            
+            <!-- Player Stats Panel -->
+            <div class="glass-panel p-3 rounded-xl mythic-border flex flex-col gap-2 min-w-[280px] sm:min-w-[340px]">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-shield-halved text-amber-400 text-xl"></i>
+                        <span class="font-cinzel text-lg font-bold text-amber-200">Paladino Sagrado</span>
+                    </div>
+                    <span id="player-level" class="font-cinzel text-xl font-black text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/40">Nv. 1</span>
+                </div>
+
+                <!-- HP Bar -->
+                <div>
+                    <div class="flex justify-between text-xs font-bold mb-1">
+                        <span class="text-red-400"><i class="fa-solid fa-heart mr-1"></i>VIDA</span>
+                        <span id="hp-text" class="text-red-200">100 / 100</span>
+                    </div>
+                    <div class="w-full bg-gray-950 h-3.5 rounded-full overflow-hidden border border-red-900/60 relative">
+                        <div id="hp-bar" class="h-full bg-gradient-to-r from-red-700 to-red-500 transition-all duration-200" style="width: 100%;"></div>
+                    </div>
+                </div>
+
+                <!-- XP Bar -->
+                <div>
+                    <div class="flex justify-between text-xs font-bold mb-1">
+                        <span class="text-cyan-400"><i class="fa-solid fa-star mr-1"></i>EXPERIÊNCIA</span>
+                        <span id="xp-text" class="text-cyan-200">0 / 100</span>
+                    </div>
+                    <div class="w-full bg-gray-950 h-2.5 rounded-full overflow-hidden border border-cyan-900/60 relative">
+                        <div id="xp-bar" class="h-full bg-gradient-to-r from-cyan-600 to-blue-400 transition-all duration-200" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Biome & Wheel Info -->
+            <div class="glass-panel px-5 py-3 rounded-xl mythic-border flex flex-col items-center min-w-[220px]">
+                <span class="text-xs font-bold tracking-widest text-amber-400 uppercase font-cinzel">Roda dos Deuses</span>
+                <span id="biome-name" class="text-xl font-extrabold font-cinzel text-white drop-shadow">Ruínas do Olimpo</span>
+                <div class="flex items-center gap-2 mt-1 text-xs font-bold text-amber-200/90">
+                    <i class="fa-solid fa-hourglass-half animate-spin text-amber-400"></i>
+                    <span>Próximo Bioma em: <span id="biome-timer" class="text-white text-sm font-mono">30s</span></span>
+                </div>
+            </div>
+
+            <!-- Menu / Pause Prompt Button -->
+            <div class="pointer-events-auto">
+                <button id="btn-pause" class="glass-panel hover:bg-amber-500/20 text-amber-300 font-cinzel px-4 py-2 rounded-lg mythic-border flex items-center gap-2 transition font-bold">
+                    <i class="fa-solid fa-bars"></i>
+                    <span class="hidden sm:inline">MENU (ESC)</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Boss Health Bar (Hidden by default) -->
+        <div id="boss-hud" class="absolute top-40 left-1/2 -translate-x-1/2 w-[90vw] max-w-md glass-panel p-2 rounded-xl mythic-border hidden flex-col items-center gap-1 transition-all duration-500">
+            <div class="flex justify-between items-center gap-2 w-full font-cinzel px-1">
+                <span id="boss-name" class="text-sm sm:text-base font-black text-amber-300 tracking-wide uppercase">ARES - DEUS DA GUERRA</span>
+                <span id="boss-hp-text" class="text-xs sm:text-sm font-bold text-red-300 whitespace-nowrap">5000 / 5000</span>
+            </div>
+            <div class="w-full bg-gray-950 h-3 rounded-full overflow-hidden border border-red-700/80 p-0.5">
+                <div id="boss-hp-bar" class="h-full bg-gradient-to-r from-red-800 via-orange-600 to-amber-500 rounded-full transition-all duration-150" style="width: 100%;"></div>
+            </div>
+        </div>
+
+        <!-- Bottom Action Bar / Skill Hotbar -->
+        <div class="flex justify-center items-end w-full gap-3 sm:gap-4 pointer-events-auto pb-2">
+            <!-- Attack -->
+            <div class="glass-panel p-2 rounded-xl border border-amber-500/30 flex flex-col items-center relative group">
+                <span class="absolute -top-3 bg-amber-500 text-black text-[10px] font-black px-1.5 py-0.5 rounded shadow font-cinzel">ESPAÇO / CLICK</span>
+                <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-amber-950/50 flex items-center justify-center text-amber-300 text-xl font-bold">
+                    <i class="fa-solid fa-hand-fist"></i>
+                </div>
+                <span class="text-[11px] font-bold text-amber-200 mt-1">Ataque</span>
+            </div>
+
+            <!-- Q: Chama Olímpica -->
+            <div class="glass-panel p-2 rounded-xl border border-orange-500/40 flex flex-col items-center relative group">
+                <span class="absolute -top-3 bg-orange-500 text-black text-[10px] font-black px-2 py-0.5 rounded shadow font-cinzel">Q</span>
+                <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-orange-950/60 flex items-center justify-center text-orange-400 text-2xl font-bold relative overflow-hidden">
+                    <i class="fa-solid fa-fire"></i>
+                    <div id="cd-q" class="cooldown-overlay absolute bottom-0 left-0 right-0 h-0"></div>
+                </div>
+                <span class="text-[11px] font-bold text-orange-200 mt-1">Fogo</span>
+            </div>
+
+            <!-- E: Geada de Bóreas -->
+            <div class="glass-panel p-2 rounded-xl border border-cyan-500/40 flex flex-col items-center relative group">
+                <span class="absolute -top-3 bg-cyan-500 text-black text-[10px] font-black px-2 py-0.5 rounded shadow font-cinzel">E</span>
+                <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-cyan-950/60 flex items-center justify-center text-cyan-300 text-2xl font-bold relative overflow-hidden">
+                    <i class="fa-solid fa-snowflake"></i>
+                    <div id="cd-e" class="cooldown-overlay absolute bottom-0 left-0 right-0 h-0"></div>
+                </div>
+                <span class="text-[11px] font-bold text-cyan-200 mt-1">Gelo</span>
+            </div>
+
+            <!-- F: Corrente de Raios -->
+            <div class="glass-panel p-2 rounded-xl border border-yellow-500/40 flex flex-col items-center relative group">
+                <span class="absolute -top-3 bg-yellow-400 text-black text-[10px] font-black px-2 py-0.5 rounded shadow font-cinzel">F</span>
+                <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-yellow-950/60 flex items-center justify-center text-yellow-300 text-2xl font-bold relative overflow-hidden">
+                    <i class="fa-solid fa-bolt-lightning"></i>
+                    <div id="cd-f" class="cooldown-overlay absolute bottom-0 left-0 right-0 h-0"></div>
+                </div>
+                <span class="text-[11px] font-bold text-yellow-200 mt-1">Raios</span>
+            </div>
+
+            <!-- R: Super Tempestade -->
+            <div id="slot-r" class="glass-panel p-2 rounded-xl border border-purple-500/50 flex flex-col items-center relative group hidden">
+                <span class="absolute -top-3 bg-purple-500 text-white text-[10px] font-black px-2 py-0.5 rounded shadow font-cinzel">R</span>
+                <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-purple-950/80 flex items-center justify-center text-purple-300 text-2xl font-bold relative overflow-hidden shadow-lg shadow-purple-500/30">
+                    <i class="fa-solid fa-cloud-bolt"></i>
+                    <div id="cd-r" class="cooldown-overlay absolute bottom-0 left-0 right-0 h-0"></div>
+                </div>
+                <span class="text-[11px] font-bold text-purple-200 mt-1">Super Raios</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Selection Cards (Level Up every 10 / Super every 15) -->
+    <div id="modal-level-up" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex flex-col items-center justify-center p-4">
+        <div class="text-center mb-6">
+            <span id="level-modal-subtitle" class="text-amber-400 font-cinzel font-bold tracking-widest text-sm uppercase">Poder Olimpiano Concedido</span>
+            <h2 id="level-modal-title" class="text-3xl sm:text-4xl font-black font-cinzel text-white drop-shadow-lg">ESCOLHA SUA HABILIDADE</h2>
+            <p class="text-gray-300 text-sm mt-1">Selecione uma dádiva divina para enriquecer seu Paladino</p>
+        </div>
+
+        <div id="cards-container" class="flex flex-col sm:flex-row gap-6 max-w-4xl w-full justify-center">
+            <!-- Dynamic Cards Inserted Here -->
+        </div>
+    </div>
+
+    <!-- Modal: Pause / Menu -->
+    <div id="modal-pause" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-panel mythic-border p-6 rounded-2xl w-full max-w-2xl flex flex-col gap-6 relative">
+            <div class="flex justify-between items-center border-b border-amber-500/30 pb-3">
+                <h2 class="text-2xl font-black font-cinzel text-amber-400 flex items-center gap-2">
+                    <i class="fa-solid fa-scroll"></i> MENU DO PALADINO
+                </h2>
+                <button id="btn-close-pause" class="text-gray-400 hover:text-white text-2xl"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Tabs / Content -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Stats -->
+                <div class="bg-black/40 p-4 rounded-xl border border-amber-500/20 flex flex-col gap-2">
+                    <h3 class="font-cinzel text-amber-300 font-bold border-b border-amber-500/20 pb-1 text-sm uppercase">Atributos Automáticos</h3>
+                    <div class="flex justify-between text-sm"><span class="text-gray-400">Nível do Jogador:</span><span id="stat-level" class="font-bold text-amber-400">1</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-gray-400">Vida Máxima:</span><span id="stat-hp" class="font-bold text-red-400">100</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-gray-400">Dano Físico:</span><span id="stat-atk" class="font-bold text-amber-300">25</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-gray-400">Escala de Habilidade:</span><span id="stat-scale" class="font-bold text-cyan-300">1.0x</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-gray-400">Inimigos Derrotados:</span><span id="stat-kills" class="font-bold text-white">0</span></div>
+                </div>
+
+                <!-- Controls & Info -->
+                <div class="bg-black/40 p-4 rounded-xl border border-amber-500/20 flex flex-col gap-2">
+                    <h3 class="font-cinzel text-amber-300 font-bold border-b border-amber-500/20 pb-1 text-sm uppercase">Controles</h3>
+                    <div class="text-xs text-gray-300 flex justify-between"><span>Movimento:</span> <strong class="text-amber-200">WASD / Setas</strong></div>
+                    <div class="text-xs text-gray-300 flex justify-between"><span>Ataque Espada:</span> <strong class="text-amber-200">Espaço / Clique</strong></div>
+                    <div class="text-xs text-gray-300 flex justify-between"><span>Magias:</span> <strong class="text-amber-200">Q (Fogo), E (Gelo), F (Raios)</strong></div>
+                    <div class="text-xs text-gray-300 flex justify-between"><span>Super Raios:</span> <strong class="text-amber-200">R (Se liberado)</strong></div>
+                    <div class="text-xs text-gray-300 flex justify-between"><span>Regeneração HP:</span> <strong class="text-green-400">+2 HP/3s (Fora de combate)</strong></div>
+                </div>
+            </div>
+
+            <!-- Inventory Quick View -->
+            <div class="bg-black/40 p-4 rounded-xl border border-amber-500/20">
+                <h3 class="font-cinzel text-amber-300 font-bold border-b border-amber-500/20 pb-2 text-sm uppercase mb-2 flex justify-between">
+                    <span>Inventário de Relíquias</span>
+                    <span id="inventory-count" class="text-xs font-normal text-gray-400">0 / 12 Itens</span>
+                </h3>
+                <div id="inventory-grid" class="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-32 overflow-y-auto">
+                    <!-- Inventory items populate dynamically -->
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex justify-end gap-3 mt-2">
+                <button id="btn-resume" class="bg-amber-500 hover:bg-amber-400 text-black font-cinzel font-black px-6 py-2.5 rounded-xl transition shadow-lg">RETOMAR</button>
+                <button id="btn-restart" class="bg-red-950/80 hover:bg-red-800 text-red-200 font-cinzel font-bold px-4 py-2.5 rounded-xl border border-red-700/50 transition">REINICIAR</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Script -->
+    <script>
+        // --- GAME ENGINE & STATE CODE ---
+        window.addEventListener('load', () => {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+
+            function resizeCanvas() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+
+            // Audio FX Context (Synthesized sound effects for extra polish)
+            const AudioFX = {
+                ctx: null,
+                init() {
+                    try {
+                        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    } catch(e){}
+                },
+                playSword() {
+                    if(!this.ctx) return;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, this.ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.15);
+                    gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.15);
+                },
+                playLightning() {
+                    if(!this.ctx) return;
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(600, this.ctx.currentTime);
+                    osc.frequency.setValueAtTime(200, this.ctx.currentTime + 0.05);
+                    gain.gain.setValueAtTime(0.25, this.ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + 0.25);
+                },
+                playLevelUp() {
+                    if(!this.ctx) return;
+                    [261.63, 329.63, 392.00, 523.25].forEach((freq, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.value = freq;
+                        gain.gain.setValueAtTime(0.15, this.ctx.currentTime + idx * 0.08);
+                        gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + idx * 0.08 + 0.3);
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+                        osc.start(this.ctx.currentTime + idx * 0.08);
+                        osc.stop(this.ctx.currentTime + idx * 0.08 + 0.3);
+                    });
+                }
+            };
+            window.addEventListener('click', () => AudioFX.init(), { once: true });
+
+            // BIOMES DATA ("Roda dos Deuses")
+            const BIOMES = [
+                {
+                    name: "Ruínas do Olimpo",
+                    bg: "#101622",
+                    floor: "#1c2536",
+                    grid: "#2a374e",
+                    ruinColor: "#d4af37",
+                    particleColor: "#fef08a"
+                },
+                {
+                    name: "Tártaro / Submundo",
+                    bg: "#14090c",
+                    floor: "#241016",
+                    grid: "#3d1822",
+                    ruinColor: "#991b1b",
+                    particleColor: "#f87171"
+                },
+                {
+                    name: "Costa do Egeu",
+                    bg: "#081c24",
+                    floor: "#0f3240",
+                    grid: "#184e63",
+                    ruinColor: "#38bdf8",
+                    particleColor: "#7dd3fc"
+                },
+                {
+                    name: "Floresta dos Sátiros",
+                    bg: "#0a1a0f",
+                    floor: "#132e1b",
+                    grid: "#1e472a",
+                    ruinColor: "#22c55e",
+                    particleColor: "#86efac"
+                },
+                {
+                    name: "Pico Nebuloso",
+                    bg: "#0f172a",
+                    floor: "#1e293b",
+                    grid: "#334155",
+                    ruinColor: "#e2e8f0",
+                    particleColor: "#38bdf8"
+                }
+            ];
+
+            let currentBiomeIdx = 0;
+            let biomeTimer = 30; // Seconds
+
+            // GAME STATE VARIABLES
+            let isPaused = false;
+            let screenShake = 0;
+            let totalKills = 0;
+            let keys = {};
+            let mousePos = { x: canvas.width / 2, y: canvas.height / 2 };
+
+            // CAMERA
+            const camera = {
+                x: 0,
+                y: 0
+            };
+
+            // PLAYER OBJECT
+            const player = {
+                x: 0,
+                y: 0,
+                radius: 20,
+                speed: 4.5,
+                hp: 100,
+                maxHp: 100,
+                level: 1,
+                xp: 0,
+                xpNeeded: 100,
+                lastHitTime: Date.now(),
+                regenTimer: 0,
+                
+                // Cooldowns (in seconds)
+                cdQ: 0, maxCdQ: 4,
+                cdE: 0, maxCdE: 6,
+                cdF: 0, maxCdF: 5,
+                cdR: 0, maxCdR: 12,
+                hasSuperSkill: false,
+
+                // Passives unlocked
+                passives: {
+                    fireAura: false,
+                    shield: false,
+                    lifesteal: false,
+                    crit: false,
+                    giantSword: false,
+                    swiftness: false
+                },
+
+                // Attack Arc
+                isAttacking: false,
+                attackAngle: 0,
+                attackTimer: 0,
+
+                inventory: [],
+
+                getSkillScale() {
+                    // Skill sizes scale up to 3x original size at level 100
+                    return Math.min(3.0, 1.0 + (this.level - 1) * (2.0 / 99));
+                },
+
+                getAttackDamage() {
+                    return Math.floor(25 * (1 + (this.level - 1) * 0.15));
+                }
+            };
+
+            // POOLS / LISTS
+            let enemies = [];
+            let projectiles = [];
+            let particles = [];
+            let floatingTexts = [];
+            let itemsOnGround = [];
+            let ruinsList = [];
+            let currentBoss = null;
+
+            // Generate Ruin Objects in infinite space wrap
+            for(let i = 0; i < 40; i++) {
+                ruinsList.push({
+                    x: (Math.random() - 0.5) * 4000,
+                    y: (Math.random() - 0.5) * 4000,
+                    type: Math.floor(Math.random() * 3), // 0: Column, 1: Altar, 2: Statue
+                    scale: 0.8 + Math.random() * 0.5
+                });
+            }
+
+            // --- INPUT LISTENERS ---
+            window.addEventListener('keydown', (e) => {
+                keys[e.key.toLowerCase()] = true;
+                if (e.key === 'Escape') {
+                    togglePause();
+                }
+                if (!isPaused) {
+                    if (e.key === ' ' || e.code === 'Space') {
+                        playerAttack();
+                    }
+                    if (e.key.toLowerCase() === 'q') castSkillQ();
+                    if (e.key.toLowerCase() === 'e') castSkillE();
+                    if (e.key.toLowerCase() === 'f') castSkillF();
+                    if (e.key.toLowerCase() === 'r' && player.hasSuperSkill) castSkillR();
+                }
+            });
+
+            window.addEventListener('keyup', (e) => {
+                keys[e.key.toLowerCase()] = false;
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                mousePos.x = e.clientX;
+                mousePos.y = e.clientY;
+            });
+
+            window.addEventListener('mousedown', (e) => {
+                if (e.button === 0 && !isPaused && e.target.tagName === 'CANVAS') {
+                    playerAttack();
+                }
+            });
+
+            // UI Button Events
+            document.getElementById('btn-pause').addEventListener('click', togglePause);
+            document.getElementById('btn-resume').addEventListener('click', togglePause);
+            document.getElementById('btn-close-pause').addEventListener('click', togglePause);
+            document.getElementById('btn-restart').addEventListener('click', () => location.reload());
+
+            function togglePause() {
+                isPaused = !isPaused;
+                const modal = document.getElementById('modal-pause');
+                if (isPaused) {
+                    updatePauseMenuUI();
+                    modal.classList.remove('hidden');
+                } else {
+                    modal.classList.add('hidden');
+                }
+            }
+
+            // --- PLAYER ACTIONS & SKILLS ---
+            function playerAttack() {
+                if (player.attackTimer > 0) return;
+                player.isAttacking = true;
+                player.attackTimer = 0.25; // seconds
+                
+                // Angle towards mouse
+                const worldMouseX = mousePos.x + camera.x;
+                const worldMouseY = mousePos.y + camera.y;
+                player.attackAngle = Math.atan2(worldMouseY - player.y, worldMouseX - player.x);
+
+                AudioFX.playSword();
+
+                // Hit detection in arc
+                const reach = (player.passives.giantSword ? 90 : 65) * player.getSkillScale();
+                const dmg = player.getAttackDamage() * (player.passives.crit && Math.random() < 0.3 ? 2.0 : 1.0);
+
+                enemies.forEach(enemy => {
+                    const dx = enemy.x - player.x;
+                    const dy = enemy.y - player.y;
+                    const dist = Math.hypot(dx, dy);
+                    
+                    if (dist < reach + enemy.radius) {
+                        const angleToEnemy = Math.atan2(dy, dx);
+                        let diff = Math.abs(player.attackAngle - angleToEnemy);
+                        if (diff > Math.PI) diff = Math.PI * 2 - diff;
+
+                        if (diff < Math.PI / 1.8) {
+                            damageEnemy(enemy, dmg);
+                            // Lifesteal passive
+                            if (player.passives.lifesteal) {
+                                player.hp = Math.min(player.maxHp, player.hp + dmg * 0.15);
+                            }
+                            // Knockback
+                            enemy.x += Math.cos(angleToEnemy) * 15;
+                            enemy.y += Math.sin(angleToEnemy) * 15;
+                        }
+                    }
+                });
+
+                // Sword swing arc particles
+                for (let i = -5; i <= 5; i++) {
+                    const pAngle = player.attackAngle + (i * 0.1);
+                    particles.push({
+                        x: player.x + Math.cos(pAngle) * (reach * 0.7),
+                        y: player.y + Math.sin(pAngle) * (reach * 0.7),
+                        vx: Math.cos(pAngle) * 2,
+                        vy: Math.sin(pAngle) * 2,
+                        radius: 3 * player.getSkillScale(),
+                        color: '#fef08a',
+                        life: 0.2
+                    });
+                }
+            }
+
+            // Q: Flame Explosion
+            function castSkillQ() {
+                if (player.cdQ > 0) return;
+                player.cdQ = player.maxCdQ;
+
+                const worldMouseX = mousePos.x + camera.x;
+                const worldMouseY = mousePos.y + camera.y;
+                const angle = Math.atan2(worldMouseY - player.y, worldMouseX - player.x);
+
+                const scale = player.getSkillScale();
+                projectiles.push({
+                    type: 'fireball',
+                    x: player.x,
+                    y: player.y,
+                    vx: Math.cos(angle) * 8,
+                    vy: Math.sin(angle) * 8,
+                    radius: 12 * scale,
+                    damage: Math.floor(40 * scale * (1 + player.level * 0.1)),
+                    life: 2.0,
+                    scale: scale
+                });
+            }
+
+            // E: Frost Wave
+            function castSkillE() {
+                if (player.cdE > 0) return;
+                player.cdE = player.maxCdE;
+
+                const scale = player.getSkillScale();
+                const waveRadius = 140 * scale;
+                const dmg = Math.floor(30 * scale * (1 + player.level * 0.08));
+
+                screenShake = 5;
+
+                // Slow and damage all enemies in area
+                enemies.forEach(enemy => {
+                    const dist = Math.hypot(enemy.x - player.x, enemy.y - player.y);
+                    if (dist < waveRadius + enemy.radius) {
+                        damageEnemy(enemy, dmg);
+                        enemy.slowTimer = 3.0; // Slowed for 3 seconds
+                    }
+                });
+
+                // Ice shards ring effect
+                for (let i = 0; i < 30 * scale; i++) {
+                    const ang = (Math.PI * 2 / (30 * scale)) * i;
+                    particles.push({
+                        x: player.x,
+                        y: player.y,
+                        vx: Math.cos(ang) * (6 * scale),
+                        vy: Math.sin(ang) * (6 * scale),
+                        radius: 4 * scale,
+                        color: '#38bdf8',
+                        life: 0.5
+                    });
+                }
+            }
+
+            // F: Lightning Chain
+            function castSkillF() {
+                if (player.cdF > 0) return;
+                
+                // Find primary enemy near player or cursor
+                const scale = player.getSkillScale();
+                const maxRange = 350 * scale;
+                let targets = [];
+
+                // Sort enemies by distance to player
+                let validEnemies = enemies.filter(e => Math.hypot(e.x - player.x, e.y - player.y) < maxRange);
+                if (validEnemies.length === 0) return; // No targets available
+
+                player.cdF = player.maxCdF;
+                AudioFX.playLightning();
+
+                // Chain up to 3 + floor(level/10) enemies
+                const chainCount = Math.min(8, Math.floor(3 + player.level / 15));
+                let currentPos = { x: player.x, y: player.y };
+                let visited = new Set();
+
+                for (let i = 0; i < chainCount; i++) {
+                    let closest = null;
+                    let minDist = Infinity;
+
+                    enemies.forEach(e => {
+                        if (!visited.has(e)) {
+                            const d = Math.hypot(e.x - currentPos.x, e.y - currentPos.y);
+                            if (d < minDist && d < 250 * scale) {
+                                minDist = d;
+                                closest = e;
+                            }
+                        }
+                    });
+
+                    if (closest) {
+                        visited.add(closest);
+                        targets.push(closest);
+                        currentPos = { x: closest.x, y: closest.y };
+                    } else break;
+                }
+
+                // Apply chain damage and draw electric lines
+                const baseDmg = Math.floor(35 * scale * (1 + player.level * 0.12));
+                let prev = { x: player.x, y: player.y };
+
+                targets.forEach((target, idx) => {
+                    const dmg = Math.floor(baseDmg * Math.pow(0.85, idx));
+                    damageEnemy(target, dmg);
+
+                    // Create Lightning visual beam
+                    particles.push({
+                        type: 'lightning_beam',
+                        x1: prev.x, y1: prev.y,
+                        x2: target.x, y2: target.y,
+                        color: '#facc15',
+                        life: 0.3
+                    });
+
+                    prev = { x: target.x, y: target.y };
+                });
+            }
+
+            // R: Divine Zeus Lightning Storm
+            function castSkillR() {
+                if (player.cdR > 0) return;
+                player.cdR = player.maxCdR;
+
+                screenShake = 15;
+                AudioFX.playLightning();
+
+                const scale = player.getSkillScale();
+                const boltCount = Math.floor(8 * scale);
+
+                for (let i = 0; i < boltCount; i++) {
+                    setTimeout(() => {
+                        const targetX = player.x + (Math.random() - 0.5) * 700;
+                        const targetY = player.y + (Math.random() - 0.5) * 700;
+
+                        // Visual Bolt
+                        particles.push({
+                            type: 'lightning_strike',
+                            x: targetX,
+                            y: targetY,
+                            scale: scale,
+                            life: 0.4
+                        });
+
+                        // AoE Damage
+                        const radius = 90 * scale;
+                        const dmg = Math.floor(80 * scale * (1 + player.level * 0.15));
+
+                        enemies.forEach(e => {
+                            if (Math.hypot(e.x - targetX, e.y - targetY) < radius + e.radius) {
+                                damageEnemy(e, dmg);
+                            }
+                        });
+                    }, i * 80);
+                }
+            }
+
+            // --- DAMAGE & COMBAT UTILS ---
+            function damageEnemy(enemy, amount) {
+                enemy.hp -= amount;
+                enemy.lastHitTime = Date.now();
+
+                // Floating damage text
+                floatingTexts.push({
+                    text: Math.floor(amount),
+                    x: enemy.x + (Math.random() - 0.5) * 20,
+                    y: enemy.y - 15,
+                    color: amount > 50 ? '#f59e0b' : '#ffffff',
+                    life: 0.8,
+                    fontSize: amount > 50 ? 20 : 14
+                });
+
+                // Hit particles
+                for (let i = 0; i < 4; i++) {
+                    particles.push({
+                        x: enemy.x,
+                        y: enemy.y,
+                        vx: (Math.random() - 0.5) * 4,
+                        vy: (Math.random() - 0.5) * 4,
+                        radius: 2,
+                        color: '#ef4444',
+                        life: 0.3
+                    });
+                }
+
+                if (enemy.hp <= 0) {
+                    killEnemy(enemy);
+                }
+            }
+
+            function killEnemy(enemy) {
+                totalKills++;
+                addXP(enemy.xpValue);
+
+                // Chance to drop item
+                if (Math.random() < 0.35) {
+                    dropLoot(enemy.x, enemy.y);
+                }
+
+                // Remove enemy
+                if (enemy.isBoss) {
+                    currentBoss = null;
+                    document.getElementById('boss-hud').classList.add('hidden');
+                }
+                enemies = enemies.filter(e => e !== enemy);
+            }
+
+            function damagePlayer(amount) {
+                player.hp -= amount;
+                player.lastHitTime = Date.now();
+                screenShake = 6;
+
+                floatingTexts.push({
+                    text: `-${Math.floor(amount)}`,
+                    x: player.x,
+                    y: player.y - 25,
+                    color: '#ef4444',
+                    life: 0.8,
+                    fontSize: 16
+                });
+
+                if (player.hp <= 0) {
+                    player.hp = 0;
+                    alert(`Seu Paladino sucumbiu aos monstros mitológicos!\nNível Alcançado: ${player.level}\nInimigos Mortos: ${totalKills}`);
+                    location.reload();
+                }
+            }
+
+            function addXP(amount) {
+                player.xp += amount;
+                if (player.xp >= player.xpNeeded) {
+                    player.xp -= player.xpNeeded;
+                    levelUp();
+                }
+            }
+
+            function levelUp() {
+                player.level++;
+                if (player.level > 100) player.level = 100;
+
+                player.xpNeeded = Math.floor(100 * Math.pow(1.08, player.level - 1));
+                
+                // Auto status scaling
+                player.maxHp = Math.floor(100 + (player.level - 1) * 25);
+                player.hp = player.maxHp; // Full heal on level up
+                
+                AudioFX.playLevelUp();
+
+                floatingTexts.push({
+                    text: `NÍVEL ${player.level}!`,
+                    x: player.x,
+                    y: player.y - 45,
+                    color: '#facc15',
+                    life: 1.5,
+                    fontSize: 24
+                });
+
+                // Check Level Selection Modals
+                if (player.level % 10 === 0) {
+                    triggerSkillChoiceModal(false);
+                } else if (player.level % 15 === 0) {
+                    triggerSkillChoiceModal(true);
+                }
+
+                // Check Boss Spawns
+                if (player.level === 100) {
+                    spawnBoss('ZEUS');
+                } else if (player.level === 10 || (player.level > 10 && player.level % 15 === 10)) {
+                    const gods = ['ARES', 'POSEIDON', 'HADES', 'APOLO', 'ATENA'];
+                    const randomGod = gods[Math.floor(Math.random() * gods.length)];
+                    spawnBoss(randomGod);
+                }
+            }
+
+            // --- SKILL SELECTION MODAL SYSTEM ---
+            function triggerSkillChoiceModal(isSuper) {
+                isPaused = true;
+                const modal = document.getElementById('modal-level-up');
+                const title = document.getElementById('level-modal-title');
+                const subtitle = document.getElementById('level-modal-subtitle');
+                const container = document.getElementById('cards-container');
+
+                container.innerHTML = '';
+
+                if (isSuper) {
+                    subtitle.textContent = "SUPER HABILIDADE DIVINA";
+                    title.textContent = "DÁDIVA DOS DEUSES DO OLIMPO";
+
+                    const superSkills = [
+                        { id: 'super_zeus', name: 'Tempestade de Zeus', icon: 'fa-cloud-bolt', color: 'text-purple-400', desc: 'Invocação de tempestade devastadora que atinge toda a tela com raios míticos.' },
+                        { id: 'super_shield', name: 'Égide Sagrada', icon: 'fa-shield-cat', color: 'text-amber-400', desc: 'Escudo impenetrável permanente que reduz todo o dano recebido em 30%.' },
+                        { id: 'super_aura', name: 'Aura Olímpica Incandescente', icon: 'fa-sun', color: 'text-orange-400', desc: 'Aura contínua de fogo ao redor do paladino queimando inimigos próximos.' }
+                    ];
+
+                    superSkills.forEach(s => {
+                        const card = document.createElement('div');
+                        card.className = 'mythic-card p-5 rounded-2xl flex-1 flex flex-col items-center text-center cursor-pointer';
+                        card.innerHTML = `
+                            <div class="text-4xl ${s.color} mb-3"><i class="fa-solid ${s.icon}"></i></div>
+                            <h4 class="font-cinzel text-xl font-bold text-white mb-2">${s.name}</h4>
+                            <p class="text-xs text-gray-300">${s.desc}</p>
+                        `;
+                        card.onclick = () => {
+                            if (s.id === 'super_zeus') {
+                                player.hasSuperSkill = true;
+                                document.getElementById('slot-r').classList.remove('hidden');
+                            } else if (s.id === 'super_shield') {
+                                player.passives.shield = true;
+                            } else if (s.id === 'super_aura') {
+                                player.passives.fireAura = true;
+                            }
+                            modal.classList.add('hidden');
+                            isPaused = false;
+                        };
+                        container.appendChild(card);
+                    });
+                } else {
+                    subtitle.textContent = "EVOLUÇÃO DO PALADINO";
+                    title.textContent = "ESCOLHA UMA HABILIDADE PASSIVA";
+
+                    const passivesPool = [
+                        { id: 'giantSword', name: 'Espada Gigante', icon: 'fa-khanda', color: 'text-amber-300', desc: '+50% de alcance do golpe de espada e arcos mais largos.' },
+                        { id: 'crit', name: 'Crítico Divino', icon: 'fa-crosshairs', color: 'text-red-400', desc: '30% de chance de causar o dobro de dano no ataque básico.' },
+                        { id: 'lifesteal', name: 'Vampirismo Sagrado', icon: 'fa-droplet', color: 'text-rose-400', desc: 'Recupera 15% do dano causado no ataque básico em Vida.' },
+                        { id: 'swiftness', name: 'Velocidade da Luz', icon: 'fa-bolt-lightning', color: 'text-yellow-300', desc: 'Aumenta a velocidade de movimento do Paladino em 25%.' }
+                    ];
+
+                    // Pick 3 random
+                    const shuffled = passivesPool.sort(() => 0.5 - Math.random()).slice(0, 3);
+                    shuffled.forEach(p => {
+                        const card = document.createElement('div');
+                        card.className = 'mythic-card p-5 rounded-2xl flex-1 flex flex-col items-center text-center cursor-pointer';
+                        card.innerHTML = `
+                            <div class="text-4xl ${p.color} mb-3"><i class="fa-solid ${p.icon}"></i></div>
+                            <h4 class="font-cinzel text-xl font-bold text-white mb-2">${p.name}</h4>
+                            <p class="text-xs text-gray-300">${p.desc}</p>
+                        `;
+                        card.onclick = () => {
+                            player.passives[p.id] = true;
+                            if (p.id === 'swiftness') player.speed *= 1.25;
+                            modal.classList.add('hidden');
+                            isPaused = false;
+                        };
+                        container.appendChild(card);
+                    });
+                }
+
+                modal.classList.remove('hidden');
+            }
+
+            // --- LOOT & INVENTORY SYSTEM ---
+            function dropLoot(x, y) {
+                const itemsList = [
+                    { name: "Espada Mítica", icon: "fa-sword", type: "weapon" },
+                    { name: "Armadura do Olimpo", icon: "fa-shield-halved", type: "armor" },
+                    { name: "Anel Solar", icon: "fa-ring", type: "ring" },
+                    { name: "Elixir de Vida", icon: "fa-flask", type: "potion" },
+                    { name: "Relíquia Divina", icon: "fa-gem", type: "relic" }
+                ];
+
+                const dropped = itemsList[Math.floor(Math.random() * itemsList.length)];
+                itemsOnGround.push({
+                    x: x,
+                    y: y,
+                    item: dropped,
+                    life: 15.0 // Despawns in 15s
+                });
+            }
+
+            function collectItem(itemObj) {
+                if (player.inventory.length < 12) {
+                    player.inventory.push(itemObj.item);
+                    floatingTexts.push({
+                        text: `+ ${itemObj.item.name}`,
+                        x: player.x,
+                        y: player.y - 30,
+                        color: '#67e8f9',
+                        life: 1.0,
+                        fontSize: 14
+                    });
+                    if (itemObj.item.type === 'potion') {
+                        player.hp = Math.min(player.maxHp, player.hp + player.maxHp * 0.35);
+                    }
+                }
+            }
+
+            // --- BOSS & MONSTER SPAWNING ---
+            function spawnBoss(godName) {
+                const angle = Math.random() * Math.PI * 2;
+                const bossX = player.x + Math.cos(angle) * 450;
+                const bossY = player.y + Math.sin(angle) * 450;
+
+                const isZeus = (godName === 'ZEUS');
+                const bossHp = Math.floor((isZeus ? 25000 : 5000) * (1 + (player.level - 1) * 0.1));
+
+                currentBoss = {
+                    name: godName === 'ZEUS' ? 'ZEUS - REI DO OLIMPO' : `${godName} - DEUS DA MITOLOGIA`,
+                    x: bossX,
+                    y: bossY,
+                    radius: isZeus ? 45 : 35,
+                    hp: bossHp,
+                    maxHp: bossHp,
+                    speed: isZeus ? 2.5 : 2.0,
+                    isBoss: true,
+                    type: godName,
+                    xpValue: isZeus ? 10000 : 2500,
+                    attackCd: 0,
+                    specialTimer: 0
+                };
+
+                enemies.push(currentBoss);
+
+                // Show Boss HUD
+                const bossHud = document.getElementById('boss-hud');
+                document.getElementById('boss-name').textContent = currentBoss.name;
+                bossHud.classList.remove('hidden');
+            }
+
+            function spawnRegularEnemy() {
+                if (enemies.length >= 25) return; // Cap density
+
+                const types = [
+                    { name: 'Minotauro', radius: 24, speed: 1.8, hp: 120, color: '#b45309', xp: 45 },
+                    { name: 'Esqueleto Hoplita', radius: 18, speed: 2.2, hp: 70, color: '#9ca3af', xp: 25 },
+                    { name: 'Harpia', radius: 15, speed: 3.2, hp: 50, color: '#38bdf8', xp: 30 },
+                    { name: 'Medusa', radius: 20, speed: 1.5, hp: 90, color: '#16a34a', xp: 50 },
+                    { name: 'Cérbero', radius: 28, speed: 2.0, hp: 180, color: '#dc2626', xp: 70 },
+                    { name: 'Sátiro', radius: 17, speed: 2.4, hp: 60, color: '#ca8a04', xp: 35 }
+                ];
+
+                const enemyType = types[Math.floor(Math.random() * types.length)];
+                const spawnAngle = Math.random() * Math.PI * 2;
+                const spawnDist = 600 + Math.random() * 200;
+
+                const lvlScale = 1 + (player.level - 1) * 0.12;
+
+                enemies.push({
+                    name: enemyType.name,
+                    x: player.x + Math.cos(spawnAngle) * spawnDist,
+                    y: player.y + Math.sin(spawnAngle) * spawnDist,
+                    radius: enemyType.radius,
+                    speed: enemyType.speed,
+                    hp: Math.floor(enemyType.hp * lvlScale),
+                    maxHp: Math.floor(enemyType.hp * lvlScale),
+                    color: enemyType.color,
+                    xpValue: Math.floor(enemyType.xp * lvlScale),
+                    isBoss: false,
+                    slowTimer: 0,
+                    attackCd: 0
+                });
+            }
+
+            // --- GAME LOOP & UPDATES ---
+            let lastTime = performance.now();
+
+            function gameLoop(now) {
+                const dt = Math.min((now - lastTime) / 1000, 0.1); // Delta time in seconds
+                lastTime = now;
+
+                if (!isPaused) {
+                    update(dt);
+                }
+                render();
+
+                requestAnimationFrame(gameLoop);
+            }
+
+            function update(dt) {
+                // 1. Biome & Wheel Timer
+                biomeTimer -= dt;
+                if (biomeTimer <= 0) {
+                    biomeTimer = 30;
+                    currentBiomeIdx = (currentBiomeIdx + 1) % BIOMES.length;
+                    floatingTexts.push({
+                        text: `BIOMA: ${BIOMES[currentBiomeIdx].name.toUpperCase()}`,
+                        x: player.x,
+                        y: player.y - 60,
+                        color: '#d4af37',
+                        life: 2.0,
+                        fontSize: 22
+                    });
+                }
+
+                // 2. Cooldowns
+                if (player.cdQ > 0) player.cdQ = Math.max(0, player.cdQ - dt);
+                if (player.cdE > 0) player.cdE = Math.max(0, player.cdE - dt);
+                if (player.cdF > 0) player.cdF = Math.max(0, player.cdF - dt);
+                if (player.cdR > 0) player.cdR = Math.max(0, player.cdR - dt);
+                if (player.attackTimer > 0) {
+                    player.attackTimer = Math.max(0, player.attackTimer - dt);
+                    player.isAttacking = player.attackTimer > 0;
+                }
+
+                // 3. Player Out-of-Combat Regen (+2 HP every 3s if not hit in last 3s)
+                if (Date.now() - player.lastHitTime >= 3000) {
+                    player.regenTimer += dt;
+                    if (player.regenTimer >= 3.0) {
+                        player.regenTimer = 0;
+                        if (player.hp < player.maxHp) {
+                            player.hp = Math.min(player.maxHp, player.hp + 2);
+                            floatingTexts.push({
+                                text: '+2 HP',
+                                x: player.x + 15,
+                                y: player.y - 15,
+                                color: '#4ade80',
+                                life: 0.6,
+                                fontSize: 12
+                            });
+                        }
+                    }
+                }
+
+                // 4. Player Movement
+                let moveX = 0;
+                let moveY = 0;
+                if (keys['w'] || keys['arrowup']) moveY -= 1;
+                if (keys['s'] || keys['arrowdown']) moveY += 1;
+                if (keys['a'] || keys['arrowleft']) moveX -= 1;
+                if (keys['d'] || keys['arrowright']) moveX += 1;
+
+                if (moveX !== 0 || moveY !== 0) {
+                    const len = Math.hypot(moveX, moveY);
+                    player.x += (moveX / len) * player.speed;
+                    player.y += (moveY / len) * player.speed;
+                }
+
+                // Camera smoothly follows player
+                camera.x = player.x - canvas.width / 2;
+                camera.y = player.y - canvas.height / 2;
+
+                // 5. Spawn Regular Enemies
+                if (Math.random() < 0.04) {
+                    spawnRegularEnemy();
+                }
+
+                // 6. Update Passive Aura
+                if (player.passives.fireAura) {
+                    const auraRadius = 110 * player.getSkillScale();
+                    enemies.forEach(e => {
+                        if (Math.hypot(e.x - player.x, e.y - player.y) < auraRadius) {
+                            damageEnemy(e, 0.5);
+                        }
+                    });
+                }
+
+                // 7. Update Enemies & AI
+                enemies.forEach(e => {
+                    if (e.slowTimer > 0) e.slowTimer -= dt;
+                    const effectiveSpeed = e.slowTimer > 0 ? e.speed * 0.4 : e.speed;
+
+                    const dx = player.x - e.x;
+                    const dy = player.y - e.y;
+                    const dist = Math.hypot(dx, dy);
+
+                    if (dist > 5) {
+                        e.x += (dx / dist) * effectiveSpeed;
+                        e.y += (dy / dist) * effectiveSpeed;
+                    }
+
+                    // Collision with player
+                    if (dist < e.radius + player.radius) {
+                        const baseDmg = e.isBoss ? 25 : 8;
+                        const finalDmg = player.passives.shield ? baseDmg * 0.7 : baseDmg;
+                        damagePlayer(finalDmg * dt * 2); // DPS on contact
+                    }
+
+                    // Boss special skill attacks
+                    if (e.isBoss) {
+                        e.specialTimer = (e.specialTimer || 0) + dt;
+                        if (e.specialTimer >= 4.0) {
+                            e.specialTimer = 0;
+                            // Boss AoE blast
+                            particles.push({
+                                type: 'boss_blast',
+                                x: e.x, y: e.y,
+                                radius: 150,
+                                life: 0.5
+                            });
+                            if (dist < 150 + player.radius) {
+                                damagePlayer(e.type === 'ZEUS' ? 40 : 25);
+                            }
+                        }
+                    }
+                });
+
+                // 8. Update Projectiles
+                projectiles.forEach((p, idx) => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life -= dt;
+
+                    // Flame Trail
+                    particles.push({
+                        x: p.x, y: p.y,
+                        vx: (Math.random() - 0.5) * 2,
+                        vy: (Math.random() - 0.5) * 2,
+                        radius: 5 * p.scale,
+                        color: '#f97316',
+                        life: 0.3
+                    });
+
+                    // Collision with enemies
+                    enemies.forEach(e => {
+                        if (Math.hypot(e.x - p.x, e.y - p.y) < p.radius + e.radius) {
+                            damageEnemy(e, p.damage);
+                            p.life = 0; // Explode
+                        }
+                    });
+                });
+                projectiles = projectiles.filter(p => p.life > 0);
+
+                // 9. Collect Loot
+                itemsOnGround.forEach((itemObj, idx) => {
+                    itemObj.life -= dt;
+                    if (Math.hypot(player.x - itemObj.x, player.y - itemObj.y) < player.radius + 20) {
+                        collectItem(itemObj);
+                        itemObj.life = 0;
+                    }
+                });
+                itemsOnGround = itemsOnGround.filter(i => i.life > 0);
+
+                // 10. Update Particles & Floating Texts
+                particles.forEach(p => p.life -= dt);
+                particles = particles.filter(p => p.life > 0);
+
+                floatingTexts.forEach(ft => {
+                    ft.y -= 20 * dt;
+                    ft.life -= dt;
+                });
+                floatingTexts = floatingTexts.filter(ft => ft.life > 0);
+
+                // 11. Screen Shake Decay
+                if (screenShake > 0) screenShake -= dt * 30;
+
+                // 12. Update UI DOM Elements
+                updateHUD();
+            }
+
+            // --- RENDER FUNCTION ---
+            function render() {
+                const currentBiome = BIOMES[currentBiomeIdx];
+
+                // Screen shake offset
+                ctx.save();
+                if (screenShake > 0) {
+                    ctx.translate((Math.random() - 0.5) * screenShake, (Math.random() - 0.5) * screenShake);
+                }
+
+                // 1. Draw Biome Background Floor
+                ctx.fillStyle = currentBiome.bg;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw Grid/Tiles (Infinite scrolling simulation)
+                ctx.strokeStyle = currentBiome.grid;
+                ctx.lineWidth = 1;
+                const gridSize = 100;
+                const offsetX = -camera.x % gridSize;
+                const offsetY = -camera.y % gridSize;
+
+                ctx.beginPath();
+                for (let x = offsetX; x < canvas.width; x += gridSize) {
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                }
+                for (let y = offsetY; y < canvas.height; y += gridSize) {
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                }
+                ctx.stroke();
+
+                // 2. Draw Ruins Structures
+                ruinsList.forEach(ruin => {
+                    const screenX = ruin.x - camera.x;
+                    const screenY = ruin.y - camera.y;
+
+                    // Only draw if visible on canvas
+                    if (screenX > -100 && screenX < canvas.width + 100 &&
+                        screenY > -100 && screenY < canvas.height + 100) {
+                        
+                        ctx.save();
+                        ctx.translate(screenX, screenY);
+                        ctx.scale(ruin.scale, ruin.scale);
+
+                        ctx.fillStyle = currentBiome.ruinColor;
+                        ctx.shadowColor = currentBiome.ruinColor;
+                        ctx.shadowBlur = 10;
+
+                        if (ruin.type === 0) {
+                            // Column Ruin
+                            ctx.fillRect(-12, -40, 24, 80);
+                            ctx.fillRect(-20, -50, 40, 10);
+                            ctx.fillRect(-20, 40, 40, 10);
+                        } else if (ruin.type === 1) {
+                            // Altar
+                            ctx.beginPath();
+                            ctx.arc(0, 0, 30, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.fillStyle = '#f59e0b';
+                            ctx.beginPath();
+                            ctx.arc(0, 0, 12, 0, Math.PI * 2);
+                            ctx.fill();
+                        } else {
+                            // Statue
+                            ctx.fillRect(-15, -15, 30, 30);
+                            ctx.beginPath();
+                            ctx.arc(0, -25, 12, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                        ctx.restore();
+                    }
+                });
+
+                // 3. Draw Loot Items on Ground
+                itemsOnGround.forEach(itemObj => {
+                    const sx = itemObj.x - camera.x;
+                    const sy = itemObj.y - camera.y;
+
+                    ctx.save();
+                    ctx.fillStyle = '#67e8f9';
+                    ctx.shadowColor = '#06b6d4';
+                    ctx.shadowBlur = 12;
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+                // 4. Draw Fire Aura Passive if active
+                if (player.passives.fireAura) {
+                    const px = player.x - camera.x;
+                    const py = player.y - camera.y;
+                    const auraRad = 110 * player.getSkillScale();
+
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(249, 115, 22, 0.4)';
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.arc(px, py, auraRad, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.restore();
+                }
+
+                // 5. Draw Player (Paladin)
+                const px = player.x - camera.x;
+                const py = player.y - camera.y;
+
+                ctx.save();
+                ctx.translate(px, py);
+
+                // Radiant Armor Glow
+                ctx.shadowColor = '#fef08a';
+                ctx.shadowBlur = 15;
+
+                // Body / Armor (Bright White & Gold)
+                ctx.fillStyle = '#ffffff'; // White armor
+                ctx.beginPath();
+                ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Gold Trimmings
+                ctx.strokeStyle = '#d4af37';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+
+                // Helmet Visor
+                ctx.fillStyle = '#1e293b';
+                ctx.fillRect(-6, -8, 12, 4);
+
+                // Draw the sword in the direction of the cursor, sweeping through the attack.
+                const aimAngle = Math.atan2(mousePos.y - py, mousePos.x - px);
+                const attackProgress = player.isAttacking
+                    ? 1 - player.attackTimer / 0.25
+                    : 0;
+                const swingOffset = player.isAttacking
+                    ? (attackProgress - 0.5) * 1.4
+                    : 0.18;
+                const swordScale = (player.passives.giantSword ? 1.25 : 1) * player.getSkillScale();
+
+                ctx.save();
+                ctx.rotate((player.isAttacking ? player.attackAngle : aimAngle) + swingOffset);
+                ctx.scale(swordScale, swordScale);
+
+                // Gold hilt and crossguard
+                ctx.lineCap = 'round';
+                ctx.strokeStyle = '#8b5e1a';
+                ctx.lineWidth = 7;
+                ctx.beginPath();
+                ctx.moveTo(12, 0);
+                ctx.lineTo(30, 0);
+                ctx.stroke();
+                ctx.fillStyle = '#fbbf24';
+                ctx.fillRect(27, -12, 4, 24);
+                ctx.beginPath();
+                ctx.arc(10, 0, 4, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Silver blade with a bright center edge
+                ctx.fillStyle = '#dbeafe';
+                ctx.strokeStyle = '#f8fafc';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(30, -6);
+                ctx.lineTo(68, -3);
+                ctx.lineTo(78, 0);
+                ctx.lineTo(68, 3);
+                ctx.lineTo(30, 6);
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+
+                // Brief slash trail follows the blade through its swing.
+                if (player.isAttacking) {
+                    const reach = (player.passives.giantSword ? 90 : 65) * player.getSkillScale();
+                    ctx.globalAlpha = 0.25 + (1 - attackProgress) * 0.5;
+                    ctx.strokeStyle = '#fef08a';
+                    ctx.lineWidth = 5;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, reach, player.attackAngle - Math.PI / 3, player.attackAngle + Math.PI / 3);
+                    ctx.stroke();
+                    ctx.globalAlpha = 1;
+                }
+
+                ctx.restore();
+
+                // 6. Draw Enemies & Bosses
+                enemies.forEach(e => {
+                    const ex = e.x - camera.x;
+                    const ey = e.y - camera.y;
+
+                    ctx.save();
+                    ctx.translate(ex, ey);
+
+                    if (e.isBoss) {
+                        // Zeus / God Aura
+                        ctx.shadowColor = (e.type === 'ZEUS') ? '#facc15' : '#ef4444';
+                        ctx.shadowBlur = 25;
+                    }
+
+                    // Enemy Body
+                    ctx.fillStyle = e.color || '#ef4444';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, e.radius, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Zeus details
+                    if (e.type === 'ZEUS') {
+                        ctx.fillStyle = '#ffffff'; // White Toga / Beard
+                        ctx.beginPath();
+                        ctx.arc(0, 8, e.radius * 0.7, 0, Math.PI);
+                        ctx.fill();
+
+                        ctx.strokeStyle = '#d4af37'; // Laurel Crown
+                        ctx.lineWidth = 3;
+                        ctx.strokeRect(-12, -20, 24, 6);
+                    }
+
+                    // Enemy Health Bar above head
+                    if (!e.isBoss) {
+                        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                        ctx.fillRect(-15, -e.radius - 10, 30, 4);
+                        ctx.fillStyle = '#ef4444';
+                        ctx.fillRect(-15, -e.radius - 10, (e.hp / e.maxHp) * 30, 4);
+                    }
+
+                    ctx.restore();
+                });
+
+                // 7. Draw Projectiles
+                projectiles.forEach(p => {
+                    const sx = p.x - camera.x;
+                    const sy = p.y - camera.y;
+
+                    ctx.save();
+                    ctx.fillStyle = '#f97316';
+                    ctx.shadowColor = '#ea580c';
+                    ctx.shadowBlur = 15;
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, p.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+                // 8. Draw Particles & Lightning Effects
+                particles.forEach(p => {
+                    if (p.type === 'lightning_beam') {
+                        ctx.save();
+                        ctx.strokeStyle = p.color;
+                        ctx.lineWidth = 4;
+                        ctx.shadowColor = p.color;
+                        ctx.shadowBlur = 10;
+                        ctx.beginPath();
+                        ctx.moveTo(p.x1 - camera.x, p.y1 - camera.y);
+                        ctx.lineTo(p.x2 - camera.x, p.y2 - camera.y);
+                        ctx.stroke();
+                        ctx.restore();
+                    } else if (p.type === 'lightning_strike') {
+                        const sx = p.x - camera.x;
+                        const sy = p.y - camera.y;
+                        ctx.save();
+                        ctx.strokeStyle = '#facc15';
+                        ctx.lineWidth = 6 * p.scale;
+                        ctx.shadowColor = '#fef08a';
+                        ctx.shadowBlur = 20;
+                        ctx.beginPath();
+                        ctx.moveTo(sx + (Math.random() - 0.5) * 40, sy - 400);
+                        ctx.lineTo(sx, sy);
+                        ctx.stroke();
+
+                        // Impact circle
+                        ctx.fillStyle = 'rgba(250, 204, 21, 0.4)';
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, 80 * p.scale, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    } else if (p.type === 'boss_blast') {
+                        const sx = p.x - camera.x;
+                        const sy = p.y - camera.y;
+                        ctx.save();
+                        ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
+                        ctx.strokeStyle = '#ef4444';
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.arc(sx, sy, p.radius, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.restore();
+                    } else {
+                        // Standard Particle
+                        ctx.save();
+                        ctx.fillStyle = p.color;
+                        ctx.beginPath();
+                        ctx.arc(p.x - camera.x, p.y - camera.y, Math.max(1, p.radius), 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.restore();
+                    }
+                });
+
+                // 9. Draw Floating Damage Numbers
+                floatingTexts.forEach(ft => {
+                    ctx.save();
+                    ctx.font = `bold ${ft.fontSize}px 'Rajdhani', sans-serif`;
+                    ctx.fillStyle = ft.color;
+                    ctx.shadowColor = '#000000';
+                    ctx.shadowBlur = 4;
+                    ctx.fillText(ft.text, ft.x - camera.x, ft.y - camera.y);
+                    ctx.restore();
+                });
+
+                ctx.restore(); // Restore screen shake transform
+            }
+
+            // --- HUD UI UPDATE FUNCTION ---
+            function updateHUD() {
+                document.getElementById('player-level').textContent = `Nv. ${player.level}`;
+                document.getElementById('hp-text').textContent = `${Math.ceil(player.hp)} / ${player.maxHp}`;
+                document.getElementById('hp-bar').style.width = `${(player.hp / player.maxHp) * 100}%`;
+
+                document.getElementById('xp-text').textContent = `${player.xp} / ${player.xpNeeded}`;
+                document.getElementById('xp-bar').style.width = `${(player.xp / player.xpNeeded) * 100}%`;
+
+                document.getElementById('biome-name').textContent = BIOMES[currentBiomeIdx].name;
+                document.getElementById('biome-timer').textContent = `${Math.ceil(biomeTimer)}s`;
+
+                // Ability Cooldown Overlays
+                document.getElementById('cd-q').style.height = `${(player.cdQ / player.maxCdQ) * 100}%`;
+                document.getElementById('cd-e').style.height = `${(player.cdE / player.maxCdE) * 100}%`;
+                document.getElementById('cd-f').style.height = `${(player.cdF / player.maxCdF) * 100}%`;
+                document.getElementById('cd-r').style.height = `${(player.cdR / player.maxCdR) * 100}%`;
+
+                // Boss HUD
+                if (currentBoss) {
+                    document.getElementById('boss-hp-text').textContent = `${Math.ceil(currentBoss.hp)} / ${currentBoss.maxHp}`;
+                    document.getElementById('boss-hp-bar').style.width = `${Math.max(0, (currentBoss.hp / currentBoss.maxHp) * 100)}%`;
+                }
+            }
+
+            function updatePauseMenuUI() {
+                document.getElementById('stat-level').textContent = player.level;
+                document.getElementById('stat-hp').textContent = player.maxHp;
+                document.getElementById('stat-atk').textContent = player.getAttackDamage();
+                document.getElementById('stat-scale').textContent = `${player.getSkillScale().toFixed(2)}x`;
+                document.getElementById('stat-kills').textContent = totalKills;
+
+                const grid = document.getElementById('inventory-grid');
+                grid.innerHTML = '';
+                document.getElementById('inventory-count').textContent = `${player.inventory.length} / 12 Itens`;
+
+                player.inventory.forEach(item => {
+                    const slot = document.createElement('div');
+                    slot.className = 'w-10 h-10 bg-gray-900 border border-amber-500/40 rounded flex items-center justify-center text-amber-300 text-base';
+                    slot.title = item.name;
+                    slot.innerHTML = `<i class="fa-solid ${item.icon}"></i>`;
+                    grid.appendChild(slot);
+                });
+            }
+
+            // Start Game Loop
+            requestAnimationFrame(gameLoop);
+        });
+    </script>
+</body>
+</html>
